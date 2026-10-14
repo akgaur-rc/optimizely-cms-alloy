@@ -1,0 +1,370 @@
+{
+	"info": {
+		"name": "OptiLearningAlloy - Content APIs",
+		"description": "Local collection for the Optimizely/Episerver CMS 13 Content APIs with OpenID Connect authentication.\n\nContains:\n- Auth (OpenID Connect discovery + token)\n- Content Delivery API (v4.0) — read. WORKS on this app.\n- Content Management API (v3.0) — create/update/publish/delete. REQUIRES the `EPiServer.ContentManagementApi` package to be installed and configured. That package currently has NO CMS 13-compatible release (newest 3.12.7 targets CMS 12 and fails to start on CMS 13), so these requests return 404 on this app until a compatible package ships or the site runs on CMS 12. The requests are provided ready-to-use for that scenario.\n\nUsage:\n1. Start the site: `dotnet run` (http://localhost:5000).\n2. Select the `OptiLearningAlloy - Local` environment.\n3. Run `Auth > Get Access Token` first — stores the bearer token in `accessToken`.\n4. Content Management write calls also need the `epi_content_management` scope AND a token tied to a CMS user with edit access (use the authorization_code grant with an admin/editor account — the client_credentials token has no user identity and cannot edit).",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+	},
+	"auth": {
+		"type": "bearer",
+		"bearer": [
+			{ "key": "token", "value": "{{accessToken}}", "type": "string" }
+		]
+	},
+	"item": [
+		{
+			"name": "Auth",
+			"item": [
+				{
+					"name": "Get OpenID Configuration",
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/.well-known/openid-configuration",
+							"host": ["{{baseUrl}}"],
+							"path": [".well-known", "openid-configuration"]
+						},
+						"description": "Discovery document: token endpoint, supported grant types and scopes."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Access Token (client_credentials)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"const json = pm.response.json();",
+									"if (json.access_token) {",
+									"    pm.environment.set('accessToken', json.access_token);",
+									"    console.log('accessToken stored. Expires in ' + json.expires_in + 's');",
+									"}",
+									"pm.test('Token issued', function () {",
+									"    pm.response.to.have.status(200);",
+									"    pm.expect(json.access_token).to.be.a('string');",
+									"});"
+								]
+							}
+						}
+					],
+					"request": {
+						"auth": { "type": "noauth" },
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/x-www-form-urlencoded" }
+						],
+						"body": {
+							"mode": "urlencoded",
+							"urlencoded": [
+								{ "key": "grant_type", "value": "client_credentials" },
+								{ "key": "client_id", "value": "{{clientId}}" },
+								{ "key": "client_secret", "value": "{{clientSecret}}" },
+								{ "key": "scope", "value": "{{scope}}" }
+							]
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/episerver/connect/token",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "episerver", "connect", "token"]
+						},
+						"description": "Requests a bearer token via the client_credentials grant and stores it in the `accessToken` environment variable."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Content Delivery API (v4.0)",
+			"item": [
+				{
+					"name": "Get Sites",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept-Language", "value": "{{language}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/episerver/v4.0/site",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "episerver", "v4.0", "site"]
+						},
+						"description": "Lists site definitions, content roots (start page, global assets) and languages."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Content by Id",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept-Language", "value": "{{language}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/episerver/v4.0/content/{{startPageId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "episerver", "v4.0", "content", "{{startPageId}}"]
+						},
+						"description": "Fetch a single content item by its numeric content reference id."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Content by Guid",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept-Language", "value": "{{language}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/episerver/v4.0/content/{{startPageGuid}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "episerver", "v4.0", "content", "{{startPageGuid}}"]
+						},
+						"description": "Fetch a single content item by its GUID."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Content (batch by references)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept-Language", "value": "{{language}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/episerver/v4.0/content?references={{startPageId}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "episerver", "v4.0", "content"],
+							"query": [
+								{ "key": "references", "value": "{{startPageId}}" }
+							]
+						},
+						"description": "Batch fetch by one or more numeric references (comma-separated)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Content (batch by guids)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept-Language", "value": "{{language}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/episerver/v4.0/content?guids={{startPageGuid}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "episerver", "v4.0", "content"],
+							"query": [
+								{ "key": "guids", "value": "{{startPageGuid}}" }
+							]
+						},
+						"description": "Batch fetch by one or more GUIDs (comma-separated)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Children",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept-Language", "value": "{{language}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/episerver/v4.0/content/{{startPageId}}/children",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "episerver", "v4.0", "content", "{{startPageId}}", "children"]
+						},
+						"description": "Lists the children of a content item."
+					},
+					"response": []
+				}
+			]
+		},
+		{
+			"name": "Content Management API (v3.0)",
+			"description": "Create / read / update / publish / delete content.\n\nREQUIRES the `EPiServer.ContentManagementApi` package (no CMS 13-compatible release yet — returns 404 on this app until available or on CMS 12).\n\nAuth: Bearer token with the `epi_content_management` scope, issued to a CMS user with edit access (authorization_code grant with an admin/editor login). The client_credentials token has no user identity and will be rejected for writes.",
+			"item": [
+				{
+					"name": "Create Content (draft)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (pm.response.code === 200 || pm.response.code === 201) {",
+									"    const json = pm.response.json();",
+									"    const ref = (json.contentLink && json.contentLink.id) || json.reference;",
+									"    if (ref) { pm.environment.set('contentReference', ref); console.log('contentReference =', ref); }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"API Created Page\",\n  \"language\": { \"name\": \"{{language}}\" },\n  \"contentType\": [ \"Page\", \"StandardPage\" ],\n  \"parentLink\": { \"id\": {{startPageId}} },\n  \"status\": \"CheckedOut\",\n  \"mainBody\": \"<p>Created via the Content Management API.</p>\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/episerver/v3.0/contentmanagement",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "episerver", "v3.0", "contentmanagement"]
+						},
+						"description": "Creates a new content item as a draft (status CheckedOut). On success the new content reference is stored in the `contentReference` environment variable."
+					},
+					"response": []
+				},
+				{
+					"name": "Create Content (published)",
+					"event": [
+						{
+							"listen": "test",
+							"script": {
+								"type": "text/javascript",
+								"exec": [
+									"if (pm.response.code === 200 || pm.response.code === 201) {",
+									"    const json = pm.response.json();",
+									"    const ref = (json.contentLink && json.contentLink.id) || json.reference;",
+									"    if (ref) { pm.environment.set('contentReference', ref); console.log('contentReference =', ref); }",
+									"}"
+								]
+							}
+						}
+					],
+					"request": {
+						"method": "POST",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"API Published Page\",\n  \"language\": { \"name\": \"{{language}}\" },\n  \"contentType\": [ \"Page\", \"StandardPage\" ],\n  \"parentLink\": { \"id\": {{startPageId}} },\n  \"status\": \"Published\",\n  \"mainBody\": \"<p>Created and published via the Content Management API.</p>\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/episerver/v3.0/contentmanagement",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "episerver", "v3.0", "contentmanagement"]
+						},
+						"description": "Creates and immediately publishes a new content item (status Published)."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Content (management)",
+					"request": {
+						"method": "GET",
+						"header": [
+							{ "key": "Accept-Language", "value": "{{language}}" }
+						],
+						"url": {
+							"raw": "{{baseUrl}}/api/episerver/v3.0/contentmanagement/{{contentReference}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "episerver", "v3.0", "contentmanagement", "{{contentReference}}"]
+						},
+						"description": "Reads a content item (including drafts) via the management API by reference id or GUID."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Content (PUT full replace)",
+					"request": {
+						"method": "PUT",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"API Page (updated)\",\n  \"language\": { \"name\": \"{{language}}\" },\n  \"contentType\": [ \"Page\", \"StandardPage\" ],\n  \"status\": \"CheckedOut\",\n  \"mainBody\": \"<p>Fully replaced via PUT.</p>\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/episerver/v3.0/contentmanagement/{{contentReference}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "episerver", "v3.0", "contentmanagement", "{{contentReference}}"]
+						},
+						"description": "Replaces the content version with the supplied representation (full update)."
+					},
+					"response": []
+				},
+				{
+					"name": "Update Content (PATCH partial)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"name\": \"API Page (patched name)\",\n  \"mainBody\": \"<p>Partially updated via PATCH.</p>\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/episerver/v3.0/contentmanagement/{{contentReference}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "episerver", "v3.0", "contentmanagement", "{{contentReference}}"]
+						},
+						"description": "Updates only the supplied properties on the content item (partial update)."
+					},
+					"response": []
+				},
+				{
+					"name": "Publish Content (PATCH status)",
+					"request": {
+						"method": "PATCH",
+						"header": [
+							{ "key": "Content-Type", "value": "application/json" }
+						],
+						"body": {
+							"mode": "raw",
+							"raw": "{\n  \"status\": \"Published\"\n}"
+						},
+						"url": {
+							"raw": "{{baseUrl}}/api/episerver/v3.0/contentmanagement/{{contentReference}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "episerver", "v3.0", "contentmanagement", "{{contentReference}}"]
+						},
+						"description": "Publishes the current draft by setting its status to Published."
+					},
+					"response": []
+				},
+				{
+					"name": "Get Common Drafts",
+					"request": {
+						"method": "GET",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/episerver/v3.0/contentmanagement/{{contentReference}}/common-drafts",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "episerver", "v3.0", "contentmanagement", "{{contentReference}}", "common-drafts"]
+						},
+						"description": "Lists the common (language) drafts for the content item."
+					},
+					"response": []
+				},
+				{
+					"name": "Delete Content (move to trash)",
+					"request": {
+						"method": "DELETE",
+						"header": [],
+						"url": {
+							"raw": "{{baseUrl}}/api/episerver/v3.0/contentmanagement/{{contentReference}}",
+							"host": ["{{baseUrl}}"],
+							"path": ["api", "episerver", "v3.0", "contentmanagement", "{{contentReference}}"]
+						},
+						"description": "Moves the content item to the trash (wastebasket)."
+					},
+					"response": []
+				}
+			]
+		}
+	],
+	"variable": [
+		{ "key": "baseUrl", "value": "http://localhost:5000" }
+	]
+}
